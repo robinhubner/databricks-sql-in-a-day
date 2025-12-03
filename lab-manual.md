@@ -29,60 +29,69 @@ In this lab, you will ingest two WWI sales tables and walk through a realistic B
 
 # Step 2: Ingest CSV Files into Unity Catalog
 
-1. In the Databricks workspace, click **Data** → **Add Data**.
-2. Choose **Create or modify table**, and upload:
+1. In the Databricks workspace, click **Data Ingestion** from the menue
+2. Choose **Create or modify table**, and upload (one at a time):
    - `Sales.Orders.csv`
    - `Sales.OrderLines.csv`
-3. Select ";" as the column delimiter in the advanced options
+3. Select ";" as the column delimiter in the advanced options.
 4. Select your Catalog & Schema.
 5. Complete the ingestion wizard.
 6. Open the tables in Unity Catalog and verify schema correctness.
 7. Explore metadata such as comments, descriptions, and sample data.
 
-**Data Question:** How many rows are contained in `sales_orders` and `sales_order_lines` after ingestion? Use the tab "Sample Data" to answer the question.
+**Data Question:** How many rows are contained in `sales_orders` and `sales_order_lines` after ingestion? Use the tab "Sample Data" in Unity Catalog to answer the question.
+
+**Answer**:
+sales_orders: 73.595
+sales_order_lines: 231.412
 
 ---
 
 # Step 3: Query the Data in Databricks SQL
 
-1. Open the **SQL Editor**.
+1. Open the **SQL Editor** from the menue, and open a new query.
 2. Select your Catalog and Schema.
 3. Explore the data by executing:
    ```sql
    SELECT * FROM sales_order_lines;
    ```
-4. Join both tables using autocomplete
+4. Join both tables and make use of the auto-completion.
 5. Replace the `SELECT *` with explicit columns:  
    `UnitPrice, TaxRate, PickingCompletedWhen, Description, Quantity, OrderID, OrderLineID`
-6. Add a filter to remove string with the value 'NULL':
+6. Click the kebap menue and settings to format the query.
+7. Add a filter to remove string with the value 'NULL':
    ```sql
    WHERE PickingCompletedWhen <> 'NULL'
    ```
-7. Extractc the date parts date, year, month, and day from the colum `PickingCompletedWhen`
-8. Calculate gross revenue:
+8. Extractc the date parts date, year, month, and day from the colum `PickingCompletedWhen`
+9. Calculate gross revenue:
    ```sql
    UnitPrice * Quantity * (1 + TaxRate) AS gross_revenue
    ```
-9. Ask the **Databricks Assistant** to format your SQL query.
-10. Create a new table using CTAS:
+10. Ask the **Databricks Assistant** to comment your SQL query with "/doc"
+11. Create a new table using CTAS and the previously created select statement:
     ```sql
     CREATE OR REPLACE TABLE joined_sales AS
     SELECT ...
     ```
-11. Click **See performance** on the query and inspect the execution profile.
-12. Verify the new table appears in the Catalog.
+12. Click **See performance** on the query and inspect the execution profile.
+13. Verify the new table appears in the Catalog.
 
-**Data Question:** Are there rows in `joined_sales` where the calculated gross revenue is NULL? How many?
-
+**Data Question:** What is the average gross revenue in the table `joined_sales`?
+**Answer**: 12.049
 ---
 
 # Step 4: Create a SQL Scalar Function
 
 1. Create a scalar function for gross revenue calculation:
    ```sql
-   CREATE OR REPLACE FUNCTION calc_gross_revenue(...)
-   RETURNS ...
-   RETURN ...;
+CREATE OR REPLACE FUNCTION calc_gross_revenue(
+  unit_price DOUBLE,
+  tax_rate DOUBLE,
+  quantity BIGINT
+)
+RETURNS DOUBLE
+RETURN (...);
    ```
 2. Use the function when querying `joined_sales`.
 3. Compare the UDF result with the CTAS revenue column.
@@ -101,14 +110,23 @@ In this lab, you will ingest two WWI sales tables and walk through a realistic B
    );
    ```
 
-2. Create a stored procedure `sp_refresh_yearly_gross_revenue` that upserts the gross_revenue grouped by year into the table `yearly_gross_revenue`.
-3. Execute the procedure:
+2. Create a stored procedure `sp_refresh_yearly_gross_revenue` that calculates the gross_revenue grouped by year and upserts the values into the table `yearly_gross_revenue`. Here is a framework for the stored procedure:
+   ```sql
+   CREATE OR REPLACE PROCEDURE sp_refresh_yearly_gross_revenue()
+   SQL SECURITY INVOKER
+   AS
+   BEGIN
+   SELECT 1;
+   END;
+   ```
+4. Execute the procedure:
    ```sql
    CALL sp_refresh_yearly_gross_revenue();
    ```
-4. Query the resulting table.
+5. Query the resulting table.
 
 **Data Question:** What is the total gross revenue for the year **2016**?
+**Answer:** 356.418.232
 
 ---
 
@@ -131,18 +149,18 @@ In this lab, you will ingest two WWI sales tables and walk through a realistic B
 
 # Step 7: Write a Complex SQL Query with Window Functions
 
-1. Create a YoY analysis query:
+1. Add a window function that displays the previous year sales:
    ```sql
    SELECT
      order_year,
      gross_revenue,
-     ... AS yoy_difference,
-     ... AS yoy_percentage
+     ... AS gross_revenue_previous_year
    FROM yearly_gross_revenue
    ORDER BY order_year;
    ```
 
-**Data Question:** Which year shows the highest absolute YoY growth? Which shows the highest percentage YoY growth?
+**Data Question:** Which year had the highest absolute YoY growth?
+**Answer:** 2014 - 67.556.787
 
 ---
 
